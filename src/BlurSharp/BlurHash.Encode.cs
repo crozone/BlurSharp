@@ -71,7 +71,7 @@ namespace BlurSharp
             {
                 for (int i = 0; i < componentX; i++)
                 {
-                    double normalisation = i == 0 && j == 0 ? 1 : 2;
+                    double normalisation = ((i == 0) && (j == 0)) ? 1 : 2;
                     factors[j * componentX + i] = GetBasis(imageData, stride, width, height, normalisation, i, j);
                 }
             }
@@ -190,10 +190,10 @@ namespace BlurSharp
 
         private static long EncodeDC(Factor value)
         {
-            long r = LinearTosRGB(value.R);
-            long g = LinearTosRGB(value.G);
-            long b = LinearTosRGB(value.B);
-            return (r << 16) + (g << 8) + b;
+            int roundedR = LinearTosRGB(value.R);
+            int roundedG = LinearTosRGB(value.G);
+            int roundedB = LinearTosRGB(value.B);
+            return (roundedR << 16) + (roundedG << 8) + (roundedB & 0xFF);
         }
 
         private static long EncodeAC(Factor value, double maximumValue)
