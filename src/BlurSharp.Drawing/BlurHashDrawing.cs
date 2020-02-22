@@ -16,11 +16,11 @@ namespace BlurSharp.Drawing
                 new Rectangle(0, 0, width, height),
                 ImageLockMode.ReadOnly, PixelFormat.Format24bppRgb);
 
-            // Stride is like width, but represents the number of bytes in a row,
-            // instead of the number of pixels.
+            // The stride is the width of a single row of pixels (a scan line), rounded up to a four-byte boundary.
+            // If the stride is positive, the bitmap is top-down. If the stride is negative, the bitmap is bottom-up.
             //
             int stride = curBitmapData.Stride;
-            int dataLength = stride * height;
+            int dataLength = Math.Abs(stride) * height;
 
             Span<byte> bitmapData;
 
@@ -33,7 +33,7 @@ namespace BlurSharp.Drawing
                 bitmapData = new Span<byte>(curBitmapData.Scan0.ToPointer(), dataLength);
             }
 
-            string result = BlurHash.Encode(bitmapData, width, height, componentX, componentY);
+            string result = BlurHash.Encode(bitmapData, stride, width, height, componentX, componentY);
             bufferedImage.UnlockBits(curBitmapData);
 
             return result;

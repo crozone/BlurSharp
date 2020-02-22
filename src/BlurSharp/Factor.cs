@@ -6,7 +6,7 @@ using System.Text;
 namespace BlurSharp
 {
     [StructLayout(LayoutKind.Sequential)]
-    public struct PixelDoubleFloat
+    public struct Factor
     {
         public double R;
         public double G;

@@ -11,16 +11,19 @@ namespace BlurSharp
         /// Calculates the blur hash for the given image data.
         /// </summary>
         /// <param name="imageData">The sequence of 24bpp RGB encoded bytes that make up the image.</param>
+        /// <param name="stride">The stride is the number of bytes in a row of the image.
+        /// This is usually 3 times the width, but may be more due to padding.
+        /// In a bottom-up bitmap, the stride will be negative.</param>
         /// <param name="width">The width of the image.</param>
         /// <param name="height">The height of the image.</param>
         /// <param name="componentX">The number of componants in the output hash, in the X axis.</param>
         /// <param name="componentY">The number of componants in the output hash, in the Y axis.</param>
         /// <returns>The hash result.</returns>
-        public static string Encode(ReadOnlySpan<byte> imageData, int width, int height, int componentX, int componentY, int maxStackAlloc = 1024)
+        public static string Encode(ReadOnlySpan<byte> imageData, int stride, int width, int height, int componentX, int componentY, int maxStackAlloc = 1024)
         {
             // Hashes are 30 characters maximum
             Span<char> hashBuffer = stackalloc char[MaximumHashSize];
-            Span<char> hashResult = Encode(imageData, width, height, componentX, componentY, hashBuffer, maxStackAlloc);
+            Span<char> hashResult = Encode(imageData, stride, width, height, componentX, componentY, hashBuffer, maxStackAlloc);
             return new string(hashResult);
         }
 
@@ -28,51 +31,16 @@ namespace BlurSharp
         /// Calculates the blur hash for the given image data.
         /// </summary>
         /// <param name="imageData">The sequence of 24bpp RGB encoded bytes that make up the image.</param>
+        /// <param name="stride">The stride is the number of bytes in a row of the image.
+        /// This is usually 3 times the width, but may be more due to padding.
+        /// In a bottom-up bitmap, the stride will be negative.</param>
         /// <param name="width">The width of the image.</param>
         /// <param name="height">The height of the image.</param>
         /// <param name="componentX">The number of componants in the output hash, in the X axis.</param>
         /// <param name="componentY">The number of componants in the output hash, in the Y axis.</param>
         /// <param name="hashBuffer">The character buffer used to output the hash.</param>
         /// <returns>The hash result. This result is a slice of the hashBuffer.</returns>
-        public static Span<char> Encode(ReadOnlySpan<byte> imageData, int width, int height, int componentX, int componentY, Span<char> hashBuffer, int maxStackAlloc = 1024)
-        {
-            if (width * height * 3 != imageData.Length)
-            {
-                throw new ArgumentException($"Width and height must be 3 times the length of {nameof(imageData)}");
-            }
-
-            ReadOnlySpan<Pixel24> pixels = MemoryMarshal.Cast<byte, Pixel24>(imageData);
-            return Encode(pixels, width, height, componentX, componentY, hashBuffer, maxStackAlloc);
-        }
-
-        /// <summary>
-        /// Calculates the blur has for the given pixels.
-        /// </summary>
-        /// <param name="pixels">The sequence of pixels that make up the image.</param>
-        /// <param name="width">The width of the image.</param>
-        /// <param name="height">The height of the image.</param>
-        /// <param name="componentX">The number of componants in the output hash, in the X axis.</param>
-        /// <param name="componentY">The number of componants in the output hash, in the Y axis.</param>
-        /// <returns>The hash result.</returns>
-        public static string Encode(ReadOnlySpan<Pixel24> pixels, int width, int height, int componentX, int componentY, int maxStackAlloc = 1024)
-        {
-            // Hashes are 30 characters maximum
-            Span<char> hashBuffer = stackalloc char[MaximumHashSize];
-            Span<char> hashResult = Encode(pixels, width, height, componentX, componentY, hashBuffer, maxStackAlloc);
-            return new string(hashResult);
-        }
-
-        /// <summary>
-        /// Calculates the blur has for the given pixels.
-        /// </summary>
-        /// <param name="pixels">The sequence of pixels that make up the image.</param>
-        /// <param name="width">The width of the image.</param>
-        /// <param name="height">The height of the image.</param>
-        /// <param name="componentX">The number of componants in the output hash, in the X axis.</param>
-        /// <param name="componentY">The number of componants in the output hash, in the Y axis.</param>
-        /// <param name="hashBuffer">The character buffer used to output the hash.</param>
-        /// <returns>The hash result. This result is a slice of the hashBuffer.</returns>
-        public static Span<char> Encode(ReadOnlySpan<Pixel24> pixels, int width, int height, int componentX, int componentY, Span<char> hashBuffer, int maxStackAlloc = 1024)
+        public static Span<char> Encode(ReadOnlySpan<byte> imageData, int stride, int width, int height, int componentX, int componentY, Span<char> hashBuffer, int maxStackAlloc = 1024)
         {
             if (componentX < 1 || componentX > 9)
             {
@@ -84,31 +52,39 @@ namespace BlurSharp
                 throw new ArgumentException("Blur hash component Y must have a value between 1 and 9");
             }
 
-            if (width * height != pixels.Length)
+            if (width > stride)
             {
-                throw new ArgumentException($"Width and height must be the length of {nameof(pixels)}");
+                throw new ArgumentException($"Width cannot be greater than stride");
+            }
+
+            if (Math.Abs(stride) * height != imageData.Length)
+            {
+                throw new ArgumentException($"Stride times height must be the length of {nameof(imageData)}");
             }
 
             // Stackalloc if buffer is small enough
             //
             int factorCount = componentX * componentY;
-            Span<PixelDoubleFloat> factors = (factorCount * 24) < maxStackAlloc ? stackalloc PixelDoubleFloat[factorCount] : new PixelDoubleFloat[factorCount];
+            Span<Factor> factors = (factorCount * 24) < maxStackAlloc ? stackalloc Factor[factorCount] : new Factor[factorCount];
 
             for (int j = 0; j < componentY; j++)
             {
                 for (int i = 0; i < componentX; i++)
                 {
                     double normalisation = i == 0 && j == 0 ? 1 : 2;
-                    factors[j * componentX + i] = GetBasis(pixels, width, height, normalisation, i, j);
+                    factors[j * componentX + i] = GetBasis(imageData, stride, width, height, normalisation, i, j);
                 }
             }
+
+            Factor dc = factors[0];
+            Span<Factor> ac = factors.Slice(1);
 
             // numberOfComponents + max AC + DC + 2 * AC components
             int hashSize = 1 + 1 + 4 + 2 * (factorCount - 1);
             Span<char> hash = hashBuffer.Slice(0, hashSize);
 
             // The very first part of the hash is the number of components (1 digit).
-            long numberOfComponents = componentX - 1 + (componentY - 1) * 9;
+            long numberOfComponents = (componentX - 1) + (componentY - 1) * 9;
             Base83.Encode(numberOfComponents, 1, hash);
 
             // The second part of the hash is the maximum AC component value (1 digit).
@@ -116,10 +92,10 @@ namespace BlurSharp
             double maximumValue;
             if (factors.Length > 1)
             {
-                double actualMaximumValue = MaxComponent(factors.Slice(1));
-                double quantisedMaximumValue = Math.Floor(Math.Max(0, Math.Min(82, Math.Floor(actualMaximumValue * 166 - 0.5))));
-                maximumValue = (quantisedMaximumValue + 1) / 166;
-                Base83.Encode((long)Math.Round(quantisedMaximumValue), 1, hash.Slice(1));
+                double actualMaximumValue = MaxComponent(ac);
+                int quantisedMaximumValue = (int)Math.Max(0, Math.Min(82, Math.Floor(actualMaximumValue * 166 - 0.5)));
+                maximumValue = (quantisedMaximumValue + 1) / (double)166;
+                Base83.Encode(quantisedMaximumValue, 1, hash.Slice(1));
             }
             else
             {
@@ -128,22 +104,21 @@ namespace BlurSharp
             }
 
             // The third part of the hash is the average colour of the image (4 digits).
-            // The average colour of the image in sRGB space, encoded as a 24-bit RGB value, with R in the most signficant position.
-            PixelDoubleFloat dc = factors[0];
+            // The average colour of the image in sRGB space, encoded as a 24-bit RGB value, with R in the most signficant position.            
             Base83.Encode(EncodeDC(dc), 4, hash.Slice(2));
 
             // The fourth part of the hash is AC components array. (2 digits each, nx * ny - 1 components in total)
-            for (int i = 0; i < factors.Length; i++)
+            for (int i = 0; i < ac.Length; i++)
             {
-                Base83.Encode(EncodeAC(factors[i], maximumValue), 2, hash.Slice(6 + 2 * (i - 1)));
+                Base83.Encode(EncodeAC(ac[i], maximumValue), 2, hash.Slice(6 + 2 * (i - 1)));
             }
 
             return hash;
         }
 
-        private static PixelDoubleFloat GetBasis(
-            ReadOnlySpan<Pixel24> pixels,
-            int width, int height,
+        private static Factor GetBasis(
+            ReadOnlySpan<byte> imageData,
+            int stride, int width, int height,
             double normalisation,
             int i, int j)
         {
@@ -153,14 +128,27 @@ namespace BlurSharp
                 for (int y = 0; y < height; y++)
                 {
                     double basis = normalisation * Math.Cos((Math.PI * i * x) / width) * Math.Cos((Math.PI * j * y) / height);
-                    Pixel24 pixel = pixels[y * width + x];
-                    r += basis * SRGBToLinear(pixel.R);
-                    g += basis * SRGBToLinear(pixel.G);
-                    b += basis * SRGBToLinear(pixel.B);
+
+                    int rowOffset;
+                    if (stride > 0)
+                    {
+                        // Top-down bitmap
+                        rowOffset = y * stride;
+                    }
+                    else
+                    {
+                        // Bottom-up bitmap
+                        rowOffset = (height - 1 - y) * Math.Abs(stride);
+                    }
+
+                    ReadOnlySpan<byte> pixel = imageData.Slice(rowOffset + x * 3, 3);
+                    r += basis * SRGBToLinear(pixel[0]);
+                    g += basis * SRGBToLinear(pixel[1]);
+                    b += basis * SRGBToLinear(pixel[2]);
                 }
             }
             double scale = 1.0 / (width * height);
-            return new PixelDoubleFloat()
+            return new Factor()
             {
                 R = r * scale,
                 G = g * scale,
@@ -181,7 +169,7 @@ namespace BlurSharp
             }
         }
 
-        private static double MaxComponent(Span<PixelDoubleFloat> values)
+        private static double MaxComponent(Span<Factor> values)
         {
             double result = double.NegativeInfinity;
             for (int i = 0; i < values.Length; i++)
@@ -195,12 +183,12 @@ namespace BlurSharp
             return result;
         }
 
-        private static double MaxComponent(PixelDoubleFloat factor)
+        private static double MaxComponent(Factor factor)
         {
-            return Math.Max(factor.R, Math.Max(factor.G, factor.B));
+            return Math.Max(Math.Abs(factor.R), Math.Max(Math.Abs(factor.G), Math.Abs(factor.B)));
         }
 
-        private static long EncodeDC(PixelDoubleFloat value)
+        private static long EncodeDC(Factor value)
         {
             long r = LinearTosRGB(value.R);
             long g = LinearTosRGB(value.G);
@@ -208,7 +196,7 @@ namespace BlurSharp
             return (r << 16) + (g << 8) + b;
         }
 
-        private static long EncodeAC(PixelDoubleFloat value, double maximumValue)
+        private static long EncodeAC(Factor value, double maximumValue)
         {
             double quantR = Math.Floor(Math.Max(0, Math.Min(18, Math.Floor(SignPow(value.R / maximumValue, 0.5) * 9 + 9.5))));
             double quantG = Math.Floor(Math.Max(0, Math.Min(18, Math.Floor(SignPow(value.G / maximumValue, 0.5) * 9 + 9.5))));
