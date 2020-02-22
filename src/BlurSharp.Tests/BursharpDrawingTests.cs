@@ -43,6 +43,14 @@ namespace BlurSharp.Tests
         }
 
         [Fact]
+        public void Doughnut43ACComponentsTest()
+        {
+            Bitmap bitmap = new Bitmap(Image.FromFile("./img/doughnut.png"));
+            string hashResult = BlurHashDrawing.Encode(bitmap, 4, 3);
+            Assert.Equal(Doughnut43Hash.Substring(6), hashResult.Substring(6));
+        }
+
+        [Fact]
         public void DoughnutBlackAndWhite43FullTest()
         {
             Bitmap bitmap = new Bitmap(Image.FromFile("./img/doughnut_black_and_white.png"));
