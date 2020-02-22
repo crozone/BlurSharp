@@ -22,7 +22,7 @@ namespace BlurSharp.Drawing
             int stride = curBitmapData.Stride;
             int dataLength = Math.Abs(stride) * height;
 
-            Span<byte> bitmapData;
+            ReadOnlySpan<byte> bitmapData;
 
             // We need an unsafe context to get a Span reference to the bitmap data without a copy.
             // We beed to make sure that we get the length correct, and that UnlockBits is not called
@@ -30,7 +30,7 @@ namespace BlurSharp.Drawing
             //
             unsafe
             {
-                bitmapData = new Span<byte>(curBitmapData.Scan0.ToPointer(), dataLength);
+                bitmapData = new ReadOnlySpan<byte>(curBitmapData.Scan0.ToPointer(), dataLength);
             }
 
             string result = BlurHash.Encode(bitmapData, stride, width, height, componentX, componentY);
