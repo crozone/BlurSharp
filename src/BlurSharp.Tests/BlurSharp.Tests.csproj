@@ -7,11 +7,15 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Remove="img\wave.bmp" />
+    <None Remove="img\doughnut.png" />
+    <None Remove="img\doughnut_black_and_white.png" />
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="img\wave.bmp">
+    <Content Include="img\doughnut.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="img\doughnut_black_and_white.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
