@@ -120,14 +120,15 @@ namespace BlurSharp
             ReadOnlySpan<byte> imageData,
             int stride, int width, int height,
             double normalisation,
-            int i, int j)
+            int xComponent, int yComponent)
         {
             double r = 0, g = 0, b = 0;
-            for (int x = 0; x < width; x++)
+
+            for (int y = 0; y < height; y++)
             {
-                for (int y = 0; y < height; y++)
+                for (int x = 0; x < width; x++)
                 {
-                    double basis = normalisation * Math.Cos((Math.PI * i * x) / width) * Math.Cos((Math.PI * j * y) / height);
+                    double basis = Math.Cos((Math.PI * xComponent * x) / width) * Math.Cos((Math.PI * yComponent * y) / height);
 
                     int rowOffset;
                     if (stride > 0)
@@ -147,7 +148,8 @@ namespace BlurSharp
                     b += basis * SRGBToLinear(pixel[2]);
                 }
             }
-            double scale = 1.0 / (width * height);
+
+            double scale = normalisation / (width * height);
             return new Factor()
             {
                 R = r * scale,
