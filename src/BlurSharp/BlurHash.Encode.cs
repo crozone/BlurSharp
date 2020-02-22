@@ -110,7 +110,7 @@ namespace BlurSharp
             // The fourth part of the hash is AC components array. (2 digits each, nx * ny - 1 components in total)
             for (int i = 0; i < ac.Length; i++)
             {
-                Base83.Encode(EncodeAC(ac[i], maximumValue), 2, hash.Slice(6 + 2 * (i - 1)));
+                Base83.Encode(EncodeAC(ac[i], maximumValue), 2, hash.Slice(6 + 2 * i));
             }
 
             return hash;
