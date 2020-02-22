@@ -217,16 +217,16 @@ namespace BlurSharp
             return Math.Abs(value) * sign;
         }
 
-        private static long LinearTosRGB(double value)
+        private static int LinearTosRGB(double value)
         {
             double v = Math.Max(0, Math.Min(1, value));
             if (v <= 0.0031308)
             {
-                return (long)(v * 12.92 * 255 + 0.5);
+                return (int)(v * 12.92 * 255 + 0.5);
             }
             else
             {
-                return (long)((1.055 * Math.Pow(v, 1 / 2.4) - 0.055) * 255 + 0.5);
+                return (int)((1.055 * Math.Pow(v, 1 / 2.4) - 0.055) * 255 + 0.5);
             }
         }
     }
