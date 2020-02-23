@@ -190,20 +190,20 @@ namespace BlurSharp
             return Math.Max(Math.Abs(factor.R), Math.Max(Math.Abs(factor.G), Math.Abs(factor.B)));
         }
 
-        private static long EncodeDC(Factor value)
+        private static int EncodeDC(Factor value)
         {
-            int roundedR = LinearTosRGB(value.R);
-            int roundedG = LinearTosRGB(value.G);
-            int roundedB = LinearTosRGB(value.B);
-            return (roundedR << 16) + (roundedG << 8) + (roundedB & 0xFF);
+            int roundedR = LinearToSRGB(value.R);
+            int roundedG = LinearToSRGB(value.G);
+            int roundedB = LinearToSRGB(value.B);
+            return (roundedR << 16) + (roundedG << 8) + roundedB;
         }
 
-        private static long EncodeAC(Factor value, double maximumValue)
+        private static int EncodeAC(Factor value, double maximumValue)
         {
-            double quantR = Math.Floor(Math.Max(0, Math.Min(18, Math.Floor(SignPow(value.R / maximumValue, 0.5) * 9 + 9.5))));
-            double quantG = Math.Floor(Math.Max(0, Math.Min(18, Math.Floor(SignPow(value.G / maximumValue, 0.5) * 9 + 9.5))));
-            double quantB = Math.Floor(Math.Max(0, Math.Min(18, Math.Floor(SignPow(value.B / maximumValue, 0.5) * 9 + 9.5))));
-            return (long)Math.Round(quantR * 19 * 19 + quantG * 19 + quantB);
+            int quantR = (int)Math.Max(0, Math.Min(18, Math.Floor(SignPow(value.R / maximumValue, 0.5) * 9 + 9.5)));
+            int quantG = (int)Math.Max(0, Math.Min(18, Math.Floor(SignPow(value.G / maximumValue, 0.5) * 9 + 9.5)));
+            int quantB = (int)Math.Max(0, Math.Min(18, Math.Floor(SignPow(value.B / maximumValue, 0.5) * 9 + 9.5)));
+            return quantR * 19 * 19 + quantG * 19 + quantB;
         }
 
         private static double SignPow(double val, double exp)
@@ -217,7 +217,7 @@ namespace BlurSharp
             return Math.Abs(value) * sign;
         }
 
-        private static int LinearTosRGB(double value)
+        private static int LinearToSRGB(double value)
         {
             double v = Math.Max(0, Math.Min(1, value));
             if (v <= 0.0031308)
