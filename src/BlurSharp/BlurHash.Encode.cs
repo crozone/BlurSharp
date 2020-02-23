@@ -72,7 +72,7 @@ namespace BlurSharp
                 for (int i = 0; i < componentX; i++)
                 {
                     double normalisation = ((i == 0) && (j == 0)) ? 1 : 2;
-                    factors[j * componentX + i] = GetBasis(imageData, stride, width, height, normalisation, i, j);
+                    factors[j * componentX + i] = GetBasis(i, j, stride, width, height, normalisation, imageData);
                 }
             }
 
@@ -117,10 +117,10 @@ namespace BlurSharp
         }
 
         private static Factor GetBasis(
-            ReadOnlySpan<byte> imageData,
+            int xComponent, int yComponent,
             int stride, int width, int height,
             double normalisation,
-            int xComponent, int yComponent)
+            ReadOnlySpan<byte> imageData)
         {
             double r = 0, g = 0, b = 0;
 
