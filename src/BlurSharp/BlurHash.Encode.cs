@@ -90,7 +90,7 @@ namespace BlurSharp
             // The second part of the hash is the maximum AC component value (1 digit).
             // All AC components are scaled by this value. It represents a floating-point value of (max + 1) / 166.
             double maximumValue;
-            if (factors.Length > 1)
+            if (factors.Length > 0)
             {
                 double actualMaximumValue = MaxComponent(ac);
                 int quantisedMaximumValue = (int)Math.Max(0, Math.Min(82, Math.Floor(actualMaximumValue * 166 - 0.5)));
