@@ -6,7 +6,6 @@ namespace BlurSharp.Drawing
 {
     public static class BlurHashDrawing
     {
-        // TODO: Create another version of this using an open source, portable image library.
         public static string Encode(Bitmap bufferedImage, int componentX, int componentY)
         {
             BitmapData curBitmapData = bufferedImage.LockBits(
@@ -32,6 +31,9 @@ namespace BlurSharp.Drawing
                 bitmapData = new ReadOnlySpan<byte>(curBitmapData.Scan0.ToPointer(), dataLength);
             }
 
+            // BlurHash encode using the span bytes of the bitmap directly.
+            // On Little Endian systems, the subpixel ordering is BGR, where B is the least significant byte.
+            // On Big Endian systems, the subpixel ordering is RGB, where R is the least significant byte.
             string result = BlurHash.Encode(bitmapData, BitConverter.IsLittleEndian, stride, width, height, componentX, componentY);
             bufferedImage.UnlockBits(curBitmapData);
 
