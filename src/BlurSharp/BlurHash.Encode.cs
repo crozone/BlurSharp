@@ -212,21 +212,21 @@ namespace BlurSharp
 
             // We don't have access to CopySign in netstandard 2.1, so emulate the behaviour here.
 
-            var value = Math.Pow(Math.Abs(val), exp);
+            var absolutePower = Math.Abs(Math.Pow(Math.Abs(val), exp));
             var sign = Math.Sign(val);
-            return Math.Abs(value) * sign;
+            return absolutePower * sign;
         }
 
         private static int LinearToSRGB(double value)
         {
-            double v = Math.Max(0, Math.Min(1, value));
-            if (v <= 0.0031308)
+            double val = Math.Max(0, Math.Min(1, value));
+            if (val <= 0.0031308)
             {
-                return (int)(v * 12.92 * 255 + 0.5);
+                return (int)(val * 12.92 * 255 + 0.5);
             }
             else
             {
-                return (int)((1.055 * Math.Pow(v, 1 / 2.4) - 0.055) * 255 + 0.5);
+                return (int)((1.055 * Math.Pow(val, 1 / 2.4) - 0.055) * 255 + 0.5);
             }
         }
     }
