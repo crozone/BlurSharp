@@ -1,61 +1,65 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
+using System.IO;
 using BlurSharp.Drawing;
 using Xunit;
+using static BlurSharp.Tests.PrecomputedHashes;
 
 namespace BlurSharp.Tests
 {
     public class BursharpDrawingTests
     {
-        private static readonly string Doughnut43Hash = "LlMF%n00%#MwS|WCWEM{R*bbWBbH";
-        private static readonly string DoughnutBlackAndWhite43Hash = "LjIY5?00?bIUofWBWBM{WBofWBj[";
-
         [Fact]
-        public void Doughnut43FullTest()
+        public void Pic1FullTest()
         {
-            Bitmap bitmap = new Bitmap(Image.FromFile("./img/doughnut.png"));
-            string hashResult = BlurHashDrawing.Encode(bitmap, 4, 3);
-            Assert.Equal(Doughnut43Hash, hashResult);
+            TestAllComponentsForImage("pic1.png");
         }
 
         [Fact]
-        public void Doughnut43NumComponentsTest()
+        public void Pic2FullTest()
         {
-            Bitmap bitmap = new Bitmap(Image.FromFile("./img/doughnut.png"));
-            string hashResult = BlurHashDrawing.Encode(bitmap, 4, 3);
-            Assert.Equal(Doughnut43Hash.Substring(0, 1), hashResult.Substring(0, 1));
+            TestAllComponentsForImage("pic2.png");
         }
 
         [Fact]
-        public void Doughnut43MaxACTest()
+        public void Pic3FullTest()
         {
-            Bitmap bitmap = new Bitmap(Image.FromFile("./img/doughnut.png"));
-            string hashResult = BlurHashDrawing.Encode(bitmap, 4, 3);
-            Assert.Equal(Doughnut43Hash.Substring(1, 1), hashResult.Substring(1, 1));
+            TestAllComponentsForImage("pic3.png");
         }
 
         [Fact]
-        public void Doughnut43AverageColorTest()
+        public void Pic4FullTest()
         {
-            Bitmap bitmap = new Bitmap(Image.FromFile("./img/doughnut.png"));
-            string hashResult = BlurHashDrawing.Encode(bitmap, 4, 3);
-            Assert.Equal(Doughnut43Hash.Substring(2, 4), hashResult.Substring(2, 4));
+            TestAllComponentsForImage("pic4.png");
         }
 
         [Fact]
-        public void Doughnut43ACComponentsTest()
+        public void Pic5FullTest()
         {
-            Bitmap bitmap = new Bitmap(Image.FromFile("./img/doughnut.png"));
-            string hashResult = BlurHashDrawing.Encode(bitmap, 4, 3);
-            Assert.Equal(Doughnut43Hash.Substring(6), hashResult.Substring(6));
+            TestAllComponentsForImage("pic5.png");
         }
 
         [Fact]
-        public void DoughnutBlackAndWhite43FullTest()
+        public void Pic6FullTest()
         {
-            Bitmap bitmap = new Bitmap(Image.FromFile("./img/doughnut_black_and_white.png"));
-            string hashResult = BlurHashDrawing.Encode(bitmap, 4, 3);
-            Assert.Equal(DoughnutBlackAndWhite43Hash, hashResult);
+            TestAllComponentsForImage("pic6.png");
+        }
+
+        private void TestAllComponentsForImage(string image)
+        {
+            string path = Path.Combine(".", "img", image);
+            Bitmap bitmap = new Bitmap(Image.FromFile(path));
+
+            for (int j = 1; j < 9; j++)
+            {
+                for (int i = 1; i < 9; i++)
+                {
+                    string precomputedHash = ImageHashes[(image, j, i)];
+                    string hashResult = BlurHashDrawing.Encode(bitmap, j, i);
+                    Assert.Equal(precomputedHash, hashResult);
+                }
+            }
         }
     }
 }
