@@ -32,7 +32,7 @@ namespace BlurSharp.Drawing
                 bitmapData = new ReadOnlySpan<byte>(curBitmapData.Scan0.ToPointer(), dataLength);
             }
 
-            string result = BlurHash.Encode(bitmapData, stride, width, height, componentX, componentY);
+            string result = BlurHash.Encode(bitmapData, BitConverter.IsLittleEndian, stride, width, height, componentX, componentY);
             bufferedImage.UnlockBits(curBitmapData);
 
             return result;

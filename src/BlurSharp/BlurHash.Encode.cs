@@ -11,6 +11,9 @@ namespace BlurSharp
         /// Calculates the blur hash for the given image data.
         /// </summary>
         /// <param name="imageData">The sequence of 24bpp RGB encoded bytes that make up the image.</param>
+        /// <param name="bgrOrder">If false, the imageData is treated as RGB, with R in the zero index.
+        /// If true, the imageData is treated as BGR, with B in the zero index.</param>
+        /// <returns>The hash result.</returns>
         /// <param name="stride">The stride is the number of bytes in a row of the image.
         /// This is usually 3 times the width, but may be more due to padding.
         /// In a bottom-up bitmap, the stride will be negative.</param>
@@ -18,12 +21,11 @@ namespace BlurSharp
         /// <param name="height">The height of the image.</param>
         /// <param name="componentX">The number of componants in the output hash, in the X axis.</param>
         /// <param name="componentY">The number of componants in the output hash, in the Y axis.</param>
-        /// <returns>The hash result.</returns>
-        public static string Encode(ReadOnlySpan<byte> imageData, int stride, int width, int height, int componentX, int componentY, int maxStackAlloc = 1024)
+        public static string Encode(ReadOnlySpan<byte> imageData, bool bgrOrder, int stride, int width, int height, int componentX, int componentY, int maxStackAlloc = 1024)
         {
             // Hashes are 30 characters maximum
             Span<char> hashBuffer = stackalloc char[MaximumHashSize];
-            Span<char> hashResult = Encode(imageData, stride, width, height, componentX, componentY, hashBuffer, maxStackAlloc);
+            Span<char> hashResult = Encode(imageData, bgrOrder, stride, width, height, componentX, componentY, hashBuffer, maxStackAlloc);
             return new string(hashResult);
         }
 
@@ -31,6 +33,9 @@ namespace BlurSharp
         /// Calculates the blur hash for the given image data.
         /// </summary>
         /// <param name="imageData">The sequence of 24bpp RGB encoded bytes that make up the image.</param>
+        /// <param name="bgrOrder">If false, the imageData is treated as RGB, with R in the zero index.
+        /// If true, the imageData is treated as BGR, with B in the zero index.</param>
+        /// <returns>The hash result.</returns>
         /// <param name="stride">The stride is the number of bytes in a row of the image.
         /// This is usually 3 times the width, but may be more due to padding.
         /// In a bottom-up bitmap, the stride will be negative.</param>
@@ -40,7 +45,7 @@ namespace BlurSharp
         /// <param name="componentY">The number of componants in the output hash, in the Y axis.</param>
         /// <param name="hashBuffer">The character buffer used to output the hash.</param>
         /// <returns>The hash result. This result is a slice of the hashBuffer.</returns>
-        public static Span<char> Encode(ReadOnlySpan<byte> imageData, int stride, int width, int height, int componentX, int componentY, Span<char> hashBuffer, int maxStackAlloc = 1024)
+        public static Span<char> Encode(ReadOnlySpan<byte> imageData, bool bgrOrder, int stride, int width, int height, int componentX, int componentY, Span<char> hashBuffer, int maxStackAlloc = 1024)
         {
             if (componentX < 1 || componentX > 9)
             {
@@ -72,7 +77,7 @@ namespace BlurSharp
                 for (int i = 0; i < componentX; i++)
                 {
                     double normalisation = ((i == 0) && (j == 0)) ? 1 : 2;
-                    factors[j * componentX + i] = GetBasis(i, j, stride, width, height, normalisation, imageData);
+                    factors[j * componentX + i] = GetBasis(i, j, stride, width, height, normalisation, imageData, bgrOrder);
                 }
             }
 
@@ -120,7 +125,8 @@ namespace BlurSharp
             int xComponent, int yComponent,
             int stride, int width, int height,
             double normalisation,
-            ReadOnlySpan<byte> imageData)
+            ReadOnlySpan<byte> imageData,
+            bool bgrOrder)
         {
             double r = 0, g = 0, b = 0;
 
@@ -130,22 +136,32 @@ namespace BlurSharp
                 {
                     double basis = Math.Cos((Math.PI * xComponent * x) / width) * Math.Cos((Math.PI * yComponent * y) / height);
 
-                    int rowOffset;
+                    int pixelOffset;
                     if (stride > 0)
                     {
                         // Top-down bitmap
-                        rowOffset = y * stride;
+                        pixelOffset = (y * stride) + (x * 3);
                     }
                     else
                     {
                         // Bottom-up bitmap
-                        rowOffset = (height - 1 - y) * Math.Abs(stride);
+                        pixelOffset = (((height - y) - 1) * Math.Abs(stride)) + (x * 3);
                     }
 
-                    ReadOnlySpan<byte> pixel = imageData.Slice(rowOffset + x * 3, 3);
-                    r += basis * SRGBToLinear(pixel[0]);
-                    g += basis * SRGBToLinear(pixel[1]);
-                    b += basis * SRGBToLinear(pixel[2]);
+                    ReadOnlySpan<byte> pixel = imageData.Slice(pixelOffset, 3);
+
+                    if (bgrOrder)
+                    {
+                        b += basis * SRGBToLinear(pixel[0]);
+                        g += basis * SRGBToLinear(pixel[1]);
+                        r += basis * SRGBToLinear(pixel[2]);
+                    }
+                    else
+                    {
+                        r += basis * SRGBToLinear(pixel[0]);
+                        g += basis * SRGBToLinear(pixel[1]);
+                        b += basis * SRGBToLinear(pixel[2]);
+                    }
                 }
             }
 
