@@ -29,11 +29,6 @@ namespace BlurSharp
             }
         }
 
-        public static int Decode(string value)
-        {
-            return Decode(value.AsSpan());
-        }
-
         public static int Decode(ReadOnlySpan<char> chars)
         {
             int result = 0;
