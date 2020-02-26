@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using BenchmarkDotNet.Attributes;
 using BlurSharp.Drawing;
 using Xunit;
 using static BlurSharp.Tests.PrecomputedHashes;
@@ -48,18 +49,22 @@ namespace BlurSharp.Tests
 
         private void TestAllComponentsForImage(string image)
         {
-            string path = Path.Combine(".", "img", image);
-            Bitmap bitmap = new Bitmap(Image.FromFile(path));
-
             for (int j = 1; j < 9; j++)
             {
                 for (int i = 1; i < 9; i++)
                 {
                     string precomputedHash = ImageHashes[(image, j, i)];
-                    string hashResult = BlurHashDrawing.Encode(bitmap, j, i);
+                    string hashResult = EncodeImage(image, j, i);
                     Assert.Equal(precomputedHash, hashResult);
                 }
             }
+        }
+
+        private string EncodeImage(string image, int xComponents, int yComponents)
+        {
+            string path = Path.Combine(".", "img", image);
+            Bitmap bitmap = new Bitmap(Image.FromFile(path));
+            return BlurHashDrawing.Encode(bitmap, xComponents, yComponents);
         }
     }
 }
