@@ -212,18 +212,8 @@ namespace BlurSharp
 
         private static int EncodeAC(Vector3 value, float maximumValue)
         {
-            Vector3 innerCalc = Vector3.Divide(value, maximumValue);
-            Vector3 calc = Vector3.Clamp(
-                Vector3.Add(
-                    Vector3.Multiply(
-                        CopySign(
-                            Vector3.SquareRoot(
-                                Vector3.Abs(innerCalc)),
-                            innerCalc),
-                        9), vector95),
-                Vector3.Zero,
-                vector18);
-
+            Vector3 scaledValue = value / maximumValue;
+            Vector3 calc = Vector3.Clamp(CopySign(Vector3.SquareRoot(Vector3.Abs(scaledValue)), scaledValue) * 9 + vector95, Vector3.Zero, vector18);
             return (int)calc.X * 19 * 19 + (int)calc.Y * 19 + (int)calc.Z;
         }
 
@@ -231,7 +221,7 @@ namespace BlurSharp
         {
             Vector3 signs = new Vector3(MathF.Sign(sign.X), MathF.Sign(sign.Y), MathF.Sign(sign.Z));
             Vector3 valueAbs = Vector3.Abs(value);
-            return Vector3.Multiply(valueAbs, signs);
+            return valueAbs * signs;
         }
 
         private static int LinearToSRGB(float value)
