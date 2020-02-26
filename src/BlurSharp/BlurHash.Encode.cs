@@ -207,8 +207,9 @@ namespace BlurSharp
             return (roundedR << 16) + (roundedG << 8) + roundedB;
         }
 
-        private static Vector3 vector18 = new Vector3(18, 18, 18);
-        private static Vector3 vector95 = new Vector3(9.5f, 9.5f, 9.5f);
+        private readonly static Vector3 vector18 = new Vector3(18, 18, 18);
+        private readonly static Vector3 vector95 = new Vector3(9.5f, 9.5f, 9.5f);
+
         private static int EncodeAC(Vector3 value, float maximumValue)
         {
             Vector3 innerCalc = Vector3.Divide(value, maximumValue);
