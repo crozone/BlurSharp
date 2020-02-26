@@ -190,12 +190,13 @@ namespace BlurSharp
 
         private static float MaxComponent(Span<Vector3> values)
         {
-            float result = float.NegativeInfinity;
+            Vector3 maxVector = new Vector3(float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity);
             for (int i = 0; i < values.Length; i++)
             {
-                float value = MathF.Max(MathF.Max(MathF.Abs(values[i].X), MathF.Max(MathF.Abs(values[i].Y), MathF.Abs(values[i].Z))), result);
+                maxVector = Vector3.Max(Vector3.Abs(values[i]), maxVector);
             }
-            return result;
+
+            return MathF.Max(maxVector.X, MathF.Max(maxVector.Y, maxVector.Z));
         }
 
         private static int EncodeDC(Vector3 value)
