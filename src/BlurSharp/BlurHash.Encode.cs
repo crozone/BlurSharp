@@ -1,11 +1,20 @@
 ﻿using System;
 using System.Numerics;
+using System.Runtime.InteropServices;
 
 namespace BlurSharp
 {
     public static partial class BlurHash
     {
-        private const int MaximumHashSize = 1 + 1 + 4 + 2 * (9 * 9 - 1);
+        private const int MaximumXComponents = 64;
+        private const int MaximumYComponents = 64;
+        private const int MaximumHashSize = 1 + 1 + 4 + 2 * (MaximumXComponents * MaximumYComponents - 1);
+
+        /// <summary>
+        /// Maximum number of bytes that any method will stackalloc in a single buffer before allocating on the heap instead.
+        /// 1024 allows for a component buffer of 9x9*24 (9 X components, 9 Y components, made from 3 single precision 4 byte floats)
+        /// </summary>
+        private const int MaximumStackAlloc = 1024;
 
         /// <summary>
         /// Calculates the blur hash for the given image data.
@@ -21,11 +30,10 @@ namespace BlurSharp
         /// <param name="height">The height of the image.</param>
         /// <param name="componentX">The number of componants in the output hash, in the X axis.</param>
         /// <param name="componentY">The number of componants in the output hash, in the Y axis.</param>
-        public static string Encode(ReadOnlySpan<byte> imageData, bool bgrOrder, int stride, int width, int height, int componentX, int componentY, int maxStackAlloc = 1024)
+        public static string Encode(ReadOnlySpan<byte> imageData, bool bgrOrder, int stride, int width, int height, int componentX, int componentY)
         {
-            // Hashes are 30 characters maximum
-            Span<char> hashBuffer = stackalloc char[MaximumHashSize];
-            Span<char> hashResult = Encode(imageData, bgrOrder, stride, width, height, componentX, componentY, hashBuffer, maxStackAlloc);
+            Span<char> hashBuffer = MaximumHashSize < MaximumStackAlloc ? stackalloc char[MaximumHashSize] : new char[MaximumHashSize];
+            Span<char> hashResult = Encode(imageData, bgrOrder, stride, width, height, componentX, componentY, hashBuffer);
             return new string(hashResult);
         }
 
@@ -45,16 +53,16 @@ namespace BlurSharp
         /// <param name="componentY">The number of componants in the output hash, in the Y axis.</param>
         /// <param name="hashBuffer">The character buffer used to output the hash.</param>
         /// <returns>The hash result. This result is a slice of the hashBuffer.</returns>
-        public static Span<char> Encode(ReadOnlySpan<byte> imageData, bool bgrOrder, int stride, int width, int height, int componentX, int componentY, Span<char> hashBuffer, int maxStackAlloc = 2048)
+        public static Span<char> Encode(ReadOnlySpan<byte> imageData, bool bgrOrder, int stride, int width, int height, int componentX, int componentY, Span<char> hashBuffer)
         {
-            if (componentX < 1 || componentX > 9)
+            if (componentX < 1 || componentX > MaximumXComponents)
             {
-                throw new ArgumentException("Blur hash component X must have a value between 1 and 9");
+                throw new ArgumentException($"Blur hash component X must have a value between 1 and {MaximumXComponents}");
             }
 
-            if (componentY < 1 || componentY > 9)
+            if (componentY < 1 || componentY > MaximumYComponents)
             {
-                throw new ArgumentException("Blur hash component Y must have a value between 1 and 9");
+                throw new ArgumentException($"Blur hash component Y must have a value between 1 and {MaximumYComponents}");
             }
 
             if (width > stride)
@@ -70,7 +78,7 @@ namespace BlurSharp
             // Stackalloc if buffer is small enough
             //
             int factorCount = componentX * componentY;
-            Span<Vector3> factors = (factorCount * 24) < maxStackAlloc ? stackalloc Vector3[factorCount] : new Vector3[factorCount];
+            Span<Vector3> factors = (factorCount * 24) < MaximumStackAlloc ? stackalloc Vector3[factorCount] : new Vector3[factorCount];
 
             for (int j = 0; j < componentY; j++)
             {
@@ -97,7 +105,7 @@ namespace BlurSharp
             float maximumValue;
             if (ac.Length > 0)
             {
-                float actualMaximumValue = MaxComponent(ac);
+                float actualMaximumValue = MaxComponentMagnitude(ac);
                 int quantisedMaximumValue = Math.Max(0, Math.Min(82, (int)(actualMaximumValue * 166 - 0.5f)));
                 maximumValue = (quantisedMaximumValue + 1) / 166.0f;
                 Base83.Encode(quantisedMaximumValue, 1, hash.Slice(1));
@@ -135,6 +143,14 @@ namespace BlurSharp
             float xMultiplier = MathF.PI * xComponent / width;
             float yMultiplier = MathF.PI * yComponent / height;
 
+            // Helper vector for cosine calculation below
+            Span<float> offsetVectorData = stackalloc float[Vector<float>.Count];
+            for (int i = 0; i < Vector<float>.Count; i++)
+            {
+                offsetVectorData[i] = i;
+            }
+            Vector<float> offsetVector = new Vector<float>(offsetVectorData);
+
             for (int y = 0; y < height; y++)
             {
                 int pixelRowOffset;
@@ -149,9 +165,23 @@ namespace BlurSharp
                     pixelRowOffset = (((height - y) - 1) * strideAbs);
                 }
 
+                float yBasis = MathF.Cos(yMultiplier * y);
+
                 for (int x = 0; x < width; x++)
                 {
-                    float basis = MathF.Cos(xMultiplier * x) * MathF.Cos(yMultiplier * y);
+                    // Profiling shows that this Cosine calculation makes up the majority of CPU time across the entire encode process.
+                    //
+                    // TODO: Speed this up in any way possible, but this may not be possible because modern .NET no longer uses x87 instructions
+                    // to calculate sin/cos, it uses the standard C implementation on the target system which will typically be very fast.
+                    //
+                    // Previous attempts (failed):
+                    // * Vectorize. Not possible because no standard instruction for SIMD Sin or Cos.
+                    // * Use lookup table with linear interpolation. Accurate, but actually slower than MathF.Cos
+                    // * Use lookup table without interpolation. Marginally faster but innacurate without huge lookup table (128KB+)
+                    // * Vectorize lookup table method slightly. Always led to significant slowdown (no way to efficiently vectorize indirect lookups)
+                    //
+                    
+                    float basis = MathF.Cos(xMultiplier * x) * yBasis;
 
                     int pixelOffset = pixelRowOffset + (x * 3);
                     ReadOnlySpan<byte> pixel = imageData.Slice(pixelOffset, 3);
@@ -188,15 +218,44 @@ namespace BlurSharp
             }
         }
 
-        private static float MaxComponent(Span<Vector3> values)
+        private static float MaxComponentMagnitude(Span<Vector3> values)
         {
-            Vector3 maxVector = new Vector3(float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity);
-            for (int i = 0; i < values.Length; i++)
+            //Vector3 maxVector = new Vector3(float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity);
+            //for (int i = 0; i < values.Length; i++)
+            //{
+            //    maxVector = Vector3.Max(Vector3.Abs(values[i]), maxVector);
+            //}
+
+            //return MathF.Max(maxVector.X, MathF.Max(maxVector.Y, maxVector.Z));
+
+            Span<float> floatSpan = MemoryMarshal.Cast<Vector3, float>(values);
+            Vector<float> maxVector = new Vector<float>(float.NegativeInfinity);
+
+            int i = 0;
+            int lastBlockIndex = floatSpan.Length - (floatSpan.Length % Vector<float>.Count);
+
+            // First, max as many entries as possible with vectors. The remaining few floats at the end will be handled later.
+            while (i < lastBlockIndex)
             {
-                maxVector = Vector3.Max(Vector3.Abs(values[i]), maxVector);
+                maxVector = Vector.Max(Vector.Abs(new Vector<float>(floatSpan.Slice(i))), maxVector);
+                i += Vector<float>.Count;
             }
 
-            return MathF.Max(maxVector.X, MathF.Max(maxVector.Y, maxVector.Z));
+            // Get the max value of all values in the max vector
+            float maxComponent = float.NegativeInfinity;
+            for (int j = 0; j < Vector<float>.Count; j++)
+            {
+                maxComponent = MathF.Max(maxVector[j], maxComponent);
+            }
+
+            // Handle any remaining floats that were too small to make up a full vector
+            while (i < floatSpan.Length)
+            {
+                maxComponent = MathF.Max(MathF.Abs(floatSpan[i]), maxComponent);
+                i += 1;
+            }
+
+            return maxComponent;
         }
 
         private static int EncodeDC(Vector3 value)
